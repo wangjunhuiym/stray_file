@@ -1,0 +1,60 @@
+--odps sql 
+--********************************************************************--
+--author:ÓñÒå
+--create time:2016-05-05 15:20:31
+--********************************************************************--
+
+CREATE TABLE IF NOT EXISTS autonavi_navi_dev.t_turn_cost_test_cases_xiaoming (
+	log_time STRING,
+	start_x DOUBLE,
+	start_y DOUBLE,
+	end_x DOUBLE,
+	end_y DOUBLE,
+	req_type STRING,
+	req_flag STRING,
+	req_ts   bigint,
+	cifa_amap_vers STRING,
+	start_city_code bigint,
+	end_city_code bigint,
+	distances  STRING
+	
+)
+PARTITIONED BY (
+	dt STRING,
+)
+LIFECYCLE 7;
+
+INSERT OVERWRITE TABLE autonavi_navi_dev.t_turn_cost_test_cases_xiaoming PARTITION (dt='${dt}')
+SELECT log_time,
+	start_x,
+	start_y,
+	end_x,
+	end_y,
+	req_type,
+	req_flag,
+	req_ts,
+	cifa_amap_vers,
+	start_city_code,
+	end_city_code,
+	distances
+FROM (
+	SELECT SPLIT(SPLIT(start_points, ';')[0], ',')[2] AS start_x
+		, SPLIT(SPLIT(start_points, ';')[0], ',')[1] AS start_y
+		, SPLIT(SPLIT(end_points, ';')[0], ',')[2] AS end_x
+		, SPLIT(SPLIT(end_points, ';')[0], ',')[1] AS end_y
+		, req_type
+		, req_flag
+		, log_time
+		, sample(10000)  AS flag
+		, start_city_code
+		, end_city_code
+		, distances
+		, req_ts
+		, cifa_amap_vers
+	FROM autonavi_navi.route_daily
+	WHERE dt IN( "20160417", "20160418","20160419","20160420","20160421","20160422","20160423")
+		AND source LIKE 'amap%'
+		AND is_reroute = false
+		AND is_silence = false
+) sub
+WHERE flag = true;

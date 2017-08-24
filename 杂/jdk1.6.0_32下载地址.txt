@@ -1,0 +1,1 @@
+ http://download.oracle.com/otn-pub/java/jdk/6u32-b05/jdk-6u32-linux-i586.bin

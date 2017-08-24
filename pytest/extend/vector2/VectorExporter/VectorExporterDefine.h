@@ -1,0 +1,6 @@
+#ifndef _VECTOR_EXPORTER_DEFINE_HF
+#define _VECTOR_EXPORTER_DEFINE_HF
+
+typedef AnGeoMap<Gulong64 ,Gint32> ROADINDEX_MAP;
+
+#endif

@@ -1,0 +1,155 @@
+--1.route_daily_data
+CREATE TABLE IF NOT EXISTS autonavi_navi_dev.get_raw_data_from_route_daily_table_spec_1w (
+	date_time string,  --20160913
+	log_time_HMS string, --20:17:02
+	log_type string,
+	user_id string,
+	req_type string,
+	req_flag string,
+	navi_id string,
+	start_points string,
+	end_points string,
+	distances string
+)
+LIFECYCLE 30;
+INSERT OVERWRITE TABLE autonavi_navi_dev.get_raw_data_from_route_daily_table_spec_1w  
+SELECT 
+dt,
+log_time ,
+log_type ,
+uid ,
+req_type ,
+req_flag ,
+navi_id ,
+start_points ,
+end_points ,
+distances 
+from autonavi_navi.route_daily
+where dt IN( "20161031", "20161101", "20161102", "20161103", "20161104", "20161105", "20161106")
+		AND log_type = 'ROUTE'
+		AND http_mode = 'POST'
+		AND source LIKE 'amap%'
+		--AND is_reroute = false
+		and invoker IN ("plan","navi")
+		and vehicle_type <> '1'
+		and end_city_code = "110000"
+		and start_city_code = "110000"
+		and req_type IN ("0x04","0x0d")
+		
+		
+--2.route daily data add ETA
+CREATE TABLE IF NOT EXISTS autonavi_navi_dev.route_daily_add_eta_table (
+	date_time string,  --20160913
+	log_time_HMS string, --20:17:02
+	log_type string,
+	user_id string,
+	req_type string,
+	req_flag string,
+	navi_id string,
+	start_points string,
+	end_points string,
+	distances string,
+	eta_start_x string,
+	eta_start_y string,
+	eta_end_x string,
+	eta_end_y string,
+	eta_travel_time string,
+	eta_route_eta string,
+	eta_route_distance string,
+	eta_travel_distance string,
+	eta_remain_distance string,
+	eta_silence_count string,
+	eta_reroute_count string,
+	eta_route_index string
+)
+LIFECYCLE 30;
+
+INSERT OVERWRITE TABLE autonavi_navi_dev.route_daily_add_eta_table
+select a.*,
+b.start_x,
+b.start_y,
+b.end_x,
+b.end_y,
+b.travel_time,
+b.route_eta,
+b.route_distance,
+b.travel_distance,
+b.remain_distance,
+b.silence_count,
+b.reroute_count,
+b.route_index
+from 
+autonavi_navi_dev.get_raw_data_from_route_daily_table a
+join 
+(
+	select * from autonavi_navi.tbt_eta_daily
+	where dt IN( "20160906","20160907","20160908","20160909","20160910","20160911", "20160912", "20161010", "20161011", "20161012", "20161013", "20161014", "20161015", "20161016")
+	--and start_city_code IN("110000") and end_city_code IN ("110000") 
+) b
+on a.date_time = b.dt and a.user_id = b.uid and a.navi_id = b.navi_id
+
+--3.去重+95%导航完成率 22个参数
+CREATE TABLE IF NOT EXISTS autonavi_navi_dev.route_daily_add_eta_finish95percent_delete_repeat_table (
+	date_time string,  --20160913
+	log_time_HMS string, --20:17:02
+	log_type string,
+	user_id string,
+	req_type string,
+	req_flag string,
+	navi_id string,
+	start_points string,
+	end_points string,
+	distances string,
+	eta_start_x string,
+	eta_start_y string,
+	eta_end_x string,
+	eta_end_y string,
+	eta_travel_time string,
+	eta_route_eta string,
+	eta_route_distance string,
+	eta_travel_distance string,
+	eta_remain_distance string,
+	eta_silence_count string,
+	eta_reroute_count string,
+	eta_route_index string
+)
+LIFECYCLE 30;
+
+
+--distance(start_point，eta_start_xy) < 1000  --64282771  ,同时也删除了发起导航的起点与实走起点不一样的情况
+INSERT OVERWRITE TABLE autonavi_navi_dev.route_daily_add_eta_finish95percent_delete_repeat_table 
+select split_attr_str_UDTF(attr_str) as (date_time,log_time_HMS,log_type,user_id,req_type,req_flag,navi_id,start_points,end_points,distances,eta_start_x,eta_start_y,eta_end_x,eta_end_y,eta_travel_time,eta_route_eta,eta_route_distance,eta_travel_distance,eta_remain_distance,eta_silence_count,eta_reroute_count,eta_route_index) 
+from 
+(
+	select combine_attr_str_UDAF(date_time,log_time_HMS,log_type,user_id,req_type,req_flag,navi_id,start_points,end_points,distances,eta_start_x,eta_start_y,eta_end_x,eta_end_y,eta_travel_time,eta_route_eta,eta_route_distance,eta_travel_distance,eta_remain_distance,eta_silence_count,eta_reroute_count,eta_route_index) 
+	as attr_str 
+	from autonavi_navi_dev.route_daily_add_eta_table 
+	where (cast(eta_travel_distance as double) + cast(eta_remain_distance as double) > 0) and (cast(eta_remain_distance as double) / (cast(eta_travel_distance as double) + cast(eta_remain_distance as double)) <0.05)
+	group by user_id,navi_id
+) a;
+
+
+--3.1 获取1000w数据为了预测准备：
+CREATE TABLE IF NOT EXISTS autonavi_navi_dev.route_daily_add_eta_finish95percent_delete_repeat_table_spec_1000w (
+	date_time string,  --20160913
+	log_time_HMS string, --20:17:02
+	log_type string,
+	user_id string,
+	req_type string,
+	req_flag string,
+	navi_id string,
+	eta_start_xy_end_xy string
+)
+LIFECYCLE 30;
+
+INSERT OVERWRITE TABLE autonavi_navi_dev.route_daily_add_eta_finish95percent_delete_repeat_table_spec_1000w 
+select date_time,log_time_HMS,log_type,user_id,req_type,req_flag,navi_id,
+concat(concat(concat(concat(concat(concat(eta_start_x,','),eta_start_y),','),eta_end_x),','),eta_end_y)
+from autonavi_navi_dev.route_daily_add_eta_finish95percent_delete_repeat_table
+where 
+(substr(req_flag, 10, 1) <> "2" and substr(req_flag, 10, 1) <> "a" and substr(req_flag, 10, 1) <> "6" and substr(req_flag, 10, 1) <> "e")
+and 
+(substr(req_flag, 6, 1) < "8")
+and 
+(substr(req_flag, 5, 1) IN ("4","8","c"));
+limit 10000000;
