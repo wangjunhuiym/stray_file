@@ -51,9 +51,7 @@ Ctrl+g
 svn update -r10030
 
 
-100.81.153.71
-administrator  
-passwd: alibaba%123
+
 
 
 ²é¿´ºóÌ¨½ø³Ì£ºps aux|grep run_v2.sh 	
@@ -71,16 +69,9 @@ grep -r "startup" *
 
 /etc/nginx/nginx.conf
 
-name: junhui.wang
-passwd: !Sebastian10
-
-sudo su admin
 ÃÜÂë£ºÊäÈëÎÒ×Ô¼ºµÄ
 
 ps -ef|grep nginx
-
-gaoderzrq:20160330
-
 
 ftp://mirrors.kernel.org/gnu/gcc/gcc-4.4.6/
 https://ftp.gnu.org/gnu/gmp/
